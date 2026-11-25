@@ -3,7 +3,6 @@
 package rbd
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -17,8 +16,9 @@ import (
 // does, by path. The returned file is independent of the session's
 // descriptor.
 func openStagedHeader(t *testing.T, h *EncryptionLUKSHeader) *os.File {
-	f, err := os.OpenFile(
-		fmt.Sprintf("/proc/self/fd/%d", h.Fd()), os.O_RDWR, 0)
+	path, err := h.Path()
+	require.NoError(t, err)
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
 	require.NoError(t, err)
 	return f
 }
@@ -249,7 +249,8 @@ func TestEncryptionLUKSHeader(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.NoError(t, hdr.Close())
-		assert.Equal(t, ^uintptr(0), hdr.Fd())
+		_, err = hdr.Path()
+		assert.ErrorIs(t, err, ErrEncryptionLUKSHeaderClosed)
 		assert.ErrorIs(t, hdr.Commit(), ErrEncryptionLUKSHeaderClosed)
 		assert.ErrorIs(t, hdr.Close(), ErrEncryptionLUKSHeaderClosed)
 	})

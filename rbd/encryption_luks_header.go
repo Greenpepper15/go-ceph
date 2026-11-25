@@ -10,6 +10,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 )
 
 // ErrEncryptionLUKSHeaderClosed may be returned if an api call requires an
@@ -18,7 +19,7 @@ var ErrEncryptionLUKSHeaderClosed = errors.New("RBD LUKS header session is close
 
 // EncryptionLUKSHeader is a session on a staged copy of the LUKS header of
 // an image. The copy is a file that the caller changes, for example with
-// libcryptsetup on /proc/self/fd/<fd>, and Commit writes back.
+// libcryptsetup on the path that Path returns, and Commit writes back.
 //
 // The copy holds every keyslot in use, so it is as sensitive as the header
 // itself. Close the session before the image is closed.
@@ -54,10 +55,14 @@ func (image *Image) EncryptionLUKSHeaderOpen() (*EncryptionLUKSHeader, error) {
 	return &EncryptionLUKSHeader{image: image, header: header, fd: fd}, nil
 }
 
-// Fd returns the file descriptor of the staged header. The descriptor
-// belongs to the session and is closed by Close.
-func (h *EncryptionLUKSHeader) Fd() uintptr {
-	return uintptr(h.fd)
+// Path returns a path that opens the staged header in this process, for a
+// library that takes a path. It is valid until Close. librbd hands out the
+// file as a descriptor, which belongs to the session and stays inside it.
+func (h *EncryptionLUKSHeader) Path() (string, error) {
+	if h.header == nil {
+		return "", ErrEncryptionLUKSHeaderClosed
+	}
+	return fmt.Sprintf("/proc/self/fd/%d", h.fd), nil
 }
 
 // Commit writes the staged header back to the image: the ranges that differ
